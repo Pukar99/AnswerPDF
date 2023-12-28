@@ -1,0 +1,3 @@
+i have to restart this project 
+in this project i use apk of sp8 account 
+i have to start this from begiing with creating a reader for pdf then convert that pdf to image then let that image as the previous stuff.like the invoice for tommrow.
