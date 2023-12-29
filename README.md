@@ -39,7 +39,7 @@ PDFAnswer AI is a Streamlit-based web application designed to analyze PDF docume
 The application provides a user-friendly interface to upload PDF documents and enter questions. Upon uploading a PDF and asking a question, the app utilizes the Gemini AI model to analyze the document's text and generate relevant answers. The output is displayed under the "Analysis Result" section in a clear and readable format.
 
 ## License
-[MIT License](LICENSE)
+[MIT License](LICENSE.md)
 
 ## Disclaimer
 This application is for educational and demonstration purposes only. Please do not upload sensitive or proprietary information.
