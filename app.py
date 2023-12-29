@@ -1,62 +1,84 @@
+# Import necessary libraries
+from dotenv import load_dotenv
 import streamlit as st
 import os
-import fitz  # PyMuPDF
-from PIL import Image
-import base64
+import io
+from PyPDF2 import PdfReader
 import google.generativeai as genai
-from pytesseract import image_to_string  # For OCR
+import base64
+from PIL import Image
 
-# Configure Google Generative AI with the API key
-os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# Load environment variables from .env file
+load_dotenv()
 
-# Function to read PDF and extract text (with OCR for image-based PDFs)
-def read_pdf(uploaded_file):
-    text = ""
-    with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
-        for page in doc:
-            text += page.get_text()
-            # If text is empty, attempt OCR
-            if not text:
-                image_bytes = page.get_pixmap().tobytes("png")
-                text += image_to_string(Image.open(io.BytesIO(image_bytes)))
-    return text
+# # Load and display the logo
+# logo = Image.open("logo.png")  # Replace with the path to your logo file
+# st.image(logo, width=200) 
 
-# Function to call the AI model
-def get_ai_response(input_text, image_data=None, prompt=None):
-    model = genai.GenerativeModel('gemini-pro-vision')
-    inputs = [input_text]
-    if image_data:
-        inputs.append(image_data[0])
-    if prompt:
-        inputs.append(prompt)
-    response = model.generate_content(inputs)
+# st.set_page_config(page_title="PDFAnswer AI", layout="wide")
+
+# Configure API key for Google Generative AI
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    st.error("Google API key not found. Please check your .env file.")
+    st.stop()
+genai.configure(api_key=api_key)
+
+# Function to get responses from Gemini Pro model (text-only)
+def get_gemini_response(input_prompt, input_text):
+    model = genai.GenerativeModel('gemini-pro')  # Using text-only model
+    response = model.generate_content([input_prompt, input_text])
     return response.text
 
+# Function to extract text from a PDF
+def extract_text_from_pdf(uploaded_file):
+    if uploaded_file is not None:
+        reader = PdfReader(io.BytesIO(uploaded_file.getvalue()))
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+        return text
+    else:
+        st.warning("No file uploaded. Please upload a PDF file.")
+        return None
+
+# Function to display the uploaded PDF file
+def display_pdf(uploaded_file):
+    base64_pdf = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
+    pdf_display = f'<embed src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf">'
+    st.markdown(pdf_display, unsafe_allow_html=True)
+
 # Streamlit app setup
-st.set_page_config(page_title="Student PDF Reader and AI Assistant")
-st.header("Student PDF Analysis Application")
-st.write("Upload a PDF document and receive AI-driven insights, answers, or summaries.")
+st.set_page_config(page_title="PDFAnswer AI")
+st.header("This is Your PDFAnswer AI")
+# App description
+st.markdown("""
+    This application allows you to upload a PDF document and provides an analysis of its content using the Google Gemini AI model.
+    Simply upload a PDF, and ask your Question.
+""")
 
-# File uploader widget (corrected placement)
-uploaded_file = st.file_uploader("Upload a PDF document...", type=["pdf"])
+# User input and file uploader
+uploaded_file = st.file_uploader("Upload a PDF file from where you want answer", type=["pdf"])
 
+# Display the uploaded PDF
 if uploaded_file is not None:
-    try:
-        # Convert PDF for display
-        base64_pdf = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
-        pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf"></iframe>'
-        st.markdown(pdf_display, unsafe_allow_html=True)
+    display_pdf(uploaded_file)
 
-        # Extract text from PDF
-        pdf_text = read_pdf(uploaded_file)
-        if pdf_text.strip() == "":
-            st.warning("The PDF could not be processed. Please try a different file.")
-        else:
-            response = get_ai_response(pdf_text)
-            st.subheader("AI Analysis Result")
+# Analysis button and user question
+input_text = st.text_input("Enter your Question: ", key="input")
+submit = st.button("Proceed with your question")
+
+# Input prompt for the model
+input_prompt = """
+               You are an AI expert in reading and analyzing PDF documents.
+               You will receive a PDF and you will have to extract and interpret information based on its content.
+               """
+
+# Process analysis on button click
+if submit:
+    pdf_text = extract_text_from_pdf(uploaded_file)
+    if pdf_text:
+        with st.spinner('Analyzing your PDF to find Answer'):
+            response = get_gemini_response(input_prompt, pdf_text + "\n" + input_text)
+            st.subheader("Analysis Result")
             st.write(response)
-
-    except Exception as e:
-        st.error("An error occurred during analysis. Please try again.")
-        st.write(f"Error: {str(e)}")  # Log error for debugging
